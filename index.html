@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1d23">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Med Basha v96.1</title>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        const firebaseConfig = { apiKey: "AIzaSyCLi_wlkO5zB52s6Kegc6ANZVeH6mHP5DY", authDomain: "misturnos-fe3ea.firebaseapp.com", projectId: "misturnos-fe3ea", storageBucket: "misturnos-fe3ea.firebasestorage.app", messagingSenderId: "1029095925443", appId: "1:1029095925443:web:873240d85ac5160f392476" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        window.cloudSave = async (dbName, data) => { try { await setDoc(doc(db, "usuarios", "conductor_menorca", "datos", dbName), { payload: data }); } catch (e) { console.error(e); } };
+        window.setupSync = (dbName, callback) => { onSnapshot(doc(db, "usuarios", "conductor_menorca", "datos", dbName), (doc) => { if (doc.exists()) callback(doc.data().payload); }); };
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #1a1d23; color: #e2e8f0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; font-size: 1rem; }
+        .card-main { background: #23272e; border-radius: 1.2rem; border: 2px solid #2d333f; overflow: hidden; }
+        .block-hora { background-color: #1e293b; padding: 12px; border-bottom: 1px solid #ffffff05; }
+        input { background: transparent; border: none; color: white; font-weight: 900; outline: none; width: 100%; }
+        input[type="time"] { font-size: 1.8rem; color: #60a5fa; }
+        input[type="number"] { font-size: 1.6rem; color: #22d3ee; }
+        .label-custom { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; }
+        .nav-btn { flex: 1; padding: 16px; text-align: center; font-weight: 900; font-size: 0.9rem; text-transform: uppercase; border-bottom: 5px solid transparent; }
+        .nav-active { border-color: #3b82f6; color: #3b82f6; background: #23272e; }
+        .badge-aviso { animation: pulse 2s infinite; background-color: #facc15 !important; color: #000 !important; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .cal-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; font-size: 0.75rem; font-weight: 900; position: relative; background: #1e2227; }
+        .cal-today { border: 2px solid #3b82f6; }
+        .cal-selected { background: #3b82f6 !important; color: white; }
+        .dot { width: 5px; height: 5px; border-radius: 50%; position: absolute; bottom: 4px; }
+        .dot-continuo { background: #60a5fa; }
+        .dot-partido { background: #f59e0b; }
+    </style>
+</head>
+<body x-data="tmsaApp()" x-init="initApp()">
+
+    <header class="p-5 flex justify-between items-center">
+        <h1 class="text-xl font-black text-blue-500 uppercase tracking-tighter">MED BASHA <span class="text-[10px] text-gray-500 font-normal ml-1">v96.1</span></h1>
+        <button @click="abrirArchivoHistorico()" class="bg-gray-800 p-2 rounded-full border-2 border-gray-700 active:scale-90">
+            <span class="material-symbols-outlined text-white text-xl">inventory_2</span>
+        </button>
+    </header>
+
+    <nav class="flex sticky top-0 z-50 bg-[#1a1d23] border-b border-white/10">
+        <button @click="view = 'registro'" :class="view === 'registro' ? 'nav-active' : 'text-gray-500'" class="nav-btn">Registro</button>
+        <button @click="view = 'historial'" :class="view === 'historial' ? 'nav-active' : 'text-gray-500'" class="nav-btn">Resumen</button>
+    </nav>
+
+    <main x-show="view === 'registro'" class="p-4 space-y-5 pb-52">
+        <div class="card-main p-3">
+            <div class="flex justify-between items-center mb-3">
+                <button @click="prevMonth()" class="p-1"><span class="material-symbols-outlined">chevron_left</span></button>
+                <span class="font-black uppercase text-sm text-blue-400" x-text="nombreMesSeleccionado"></span>
+                <button @click="nextMonth()" class="p-1"><span class="material-symbols-outlined">chevron_right</span></button>
+            </div>
+            <div class="cal-grid">
+                <template x-for="day in calendarDays">
+                    <div @click="if(day.date) selectDate(day.date)" 
+                         class="cal-day" 
+                         :class="{'cal-today': day.isToday, 'cal-selected': day.isSelected, 'opacity-0': !day.date, 'cursor-pointer': day.date}">
+                        <span x-text="day.dayNum"></span>
+                        <template x-if="day.tipo">
+                            <div class="dot" :class="day.tipo === 'continuo' ? 'dot-continuo' : 'dot-partido'"></div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="flex gap-3 p-1.5 bg-black/30 rounded-2xl">
+            <button @click="form.tipo = 'continuo'; calcularTodo()" :class="form.tipo === 'continuo' ? 'bg-blue-600 shadow-lg' : 'text-gray-500'" class="flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all">Continuo</button>
+            <button @click="form.tipo = 'partido'; calcularTodo()" :class="form.tipo === 'partido' ? 'bg-blue-600 shadow-lg' : 'text-gray-500'" class="flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all">Partido</button>
+        </div>
+
+        <section class="card-main">
+            <div class="p-3 bg-black/40 flex justify-between items-center border-b border-white/5">
+                <span class="text-[10px] font-black uppercase text-gray-400" x-text="form.tipo === 'partido' ? 'Turno Partido' : 'Turno Continuo'"></span>
+                <div class="flex items-center gap-3">
+                    <span class="text-[10px] font-black text-yellow-500">BUS:</span>
+                    <input type="text" x-model="form.bus1" class="w-12 bg-black/30 text-center rounded-lg py-1 text-yellow-400 font-black text-xl">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2">
+                <div class="block-hora border-r border-white/5">
+                    <label class="label-custom">Entrada</label>
+                    <input type="time" x-model="form.horaE1" @input="calcularTodo(); sugerirAlarma(1)">
+                    <template x-if="alarma1.disponible">
+                        <button @click="lanzarAlarma(alarma1.hora)" class="w-full mt-2 bg-blue-600 py-2 rounded-xl font-black flex items-center justify-center gap-2 border border-white/10 active:scale-95">
+                            <span class="material-symbols-outlined text-sm">alarm</span>
+                            <span class="text-xs" x-text="alarma1.hora"></span>
+                        </button>
+                    </template>
+                </div>
+                <div class="block-hora">
+                    <label class="label-custom text-red-400">Salida</label>
+                    <input type="time" x-model="form.horaS1" @input="validarYCalcular()">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 bg-black/10 border-t border-white/5">
+                <div class="block-hora border-r border-white/5"><label class="label-custom text-cyan-400">KM Inicio</label><input type="number" x-model="form.kmI1" @input="calcularTodo()" placeholder="0"></div>
+                <div class="block-hora"><label class="label-custom text-cyan-400">KM Fin</label><input type="number" x-model="form.kmF1" @input="calcularTodo()" placeholder="0"></div>
+            </div>
+
+            <div x-show="form.tipo === 'partido'" x-cloak class="border-t-4 border-black/40">
+                <div class="grid grid-cols-2">
+                    <div class="block-hora border-r border-white/5">
+                        <label class="label-custom text-blue-300">Entrada 2</label>
+                        <input type="time" x-model="form.horaE2" @input="calcularTodo(); sugerirAlarma(2)">
+                        <template x-if="alarma2.disponible">
+                            <button @click="lanzarAlarma(alarma2.hora)" class="w-full mt-2 bg-blue-600 py-2 rounded-xl font-black flex items-center justify-center gap-2 border border-white/10 active:scale-95">
+                                <span class="material-symbols-outlined text-sm">alarm</span>
+                                <span class="text-xs" x-text="alarma2.hora"></span>
+                            </button>
+                        </template>
+                    </div>
+                    <div class="block-hora"><label class="label-custom text-red-400">Salida 2</label><input type="time" x-model="form.horaS2" @input="calcularTodo()"></div>
+                </div>
+                <div class="grid grid-cols-2 bg-black/10 border-t border-white/5">
+                    <div class="block-hora border-r border-white/5"><label class="label-custom text-cyan-400">KM Inicio 2</label><input type="number" x-model="form.kmI2" @input="calcularTodo()" placeholder="0"></div>
+                    <div class="block-hora"><label class="label-custom text-cyan-400">KM Fin 2</label><input type="number" x-model="form.kmF2" @input="calcularTodo()" placeholder="0"></div>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-2 gap-4">
+            <button @click="toggleDiet('comida')" :class="estiloBoton(form.comida)" class="py-4 rounded-xl border-2 flex flex-col items-center active:scale-95">
+                <span class="material-symbols-outlined text-2xl">restaurant</span>
+                <span class="text-[9px] font-black uppercase tracking-widest" x-text="form.comida === 'AVISO' ? '¿Comida?' : 'Comida'"></span>
+            </button>
+            <button @click="toggleDiet('cena')" :class="estiloBoton(form.cena)" class="py-4 rounded-xl border-2 flex flex-col items-center active:scale-95">
+                <span class="material-symbols-outlined text-2xl">dinner_dining</span>
+                <span class="text-[9px] font-black uppercase tracking-widest" x-text="form.cena === 'AVISO' ? '¿Cena?' : 'Cena'"></span>
+            </button>
+        </div>
+
+        <button @click="guardarJornada()" class="w-full py-6 bg-blue-700 text-white font-black rounded-2xl uppercase text-lg border-b-4 border-blue-900 active:scale-95">Guardar Jornada</button>
+    </main>
+
+    <main x-show="view === 'historial'" class="p-4 space-y-4 pb-44" x-cloak>
+        <div class="grid grid-cols-4 gap-2">
+            <div class="bg-blue-600/20 p-2 rounded-xl border border-blue-500/30 text-center"><p class="text-[10px] font-black text-blue-400">Horas</p><p class="text-xl font-black" x-text="totalesMes.horas"></p></div>
+            <div class="bg-green-600/20 p-2 rounded-xl border border-green-500/30 text-center"><p class="text-[10px] font-black text-green-400">Dietas</p><p class="text-xl font-black" x-text="totalesMes.dietas"></p></div>
+            <div class="bg-yellow-600/20 p-2 rounded-xl border border-yellow-500/30 text-center"><p class="text-[10px] font-black text-yellow-400">Noct.</p><p class="text-xl font-black" x-text="totalesMes.noct"></p></div>
+            <div class="bg-cyan-600/20 p-2 rounded-xl border border-cyan-500/30 text-center"><p class="text-[10px] font-black text-cyan-400">Kms</p><p class="text-xl font-black" x-text="totalesMes.kms"></p></div>
+        </div>
+
+        <template x-for="semana in historyByWeeks" :key="semana.num">
+            <div class="card-main mb-4">
+                <div class="bg-blue-900/30 p-2 text-[12px] font-black text-blue-300 uppercase" x-text="'Semana ' + semana.num"></div>
+                <table class="w-full text-[12px]">
+                    <thead class="bg-black/20 text-gray-500 uppercase font-black">
+                        <tr>
+                            <th class="p-2 text-left">Día</th>
+                            <th class="p-2 text-left">Bus</th>
+                            <th class="p-2 text-right">Horas</th>
+                            <th class="p-2 text-right">Noc.</th>
+                            <th class="p-2 text-right">Diet.</th>
+                            <th class="p-2 text-right">Kms</th>
+                            <th class="p-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-bold">
+                        <template x-for="item in semana.dias" :key="item.fecha">
+                            <tr class="border-b border-white/5">
+                                <td class="p-2 text-white" x-text="item.fecha.split('-').reverse()[0]"></td>
+                                <td class="text-yellow-500" x-text="item.bus"></td>
+                                <td class="text-white text-right" x-text="item.hStr"></td>
+                                <td class="text-yellow-400 text-right" x-text="item.noct"></td>
+                                <td class="text-green-500 text-right" x-text="item.dieta"></td>
+                                <td class="text-cyan-400 text-right" x-text="item.km"></td>
+                                <td class="text-right p-1"><button @click="borrarFila(item.fecha)" class="material-symbols-outlined text-red-500/40 text-lg">delete</button></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+
+        <button @click="archivarMesActual()" class="w-full py-5 border-2 border-dashed border-gray-700 text-gray-500 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 mt-5">
+            <span class="material-symbols-outlined">archive</span> Archivar mes actual
+        </button>
+    </main>
+
+    <footer x-show="view === 'registro'" class="fixed bottom-0 left-0 w-full p-4 bg-[#1a1d23] border-t border-white/10 flex justify-between items-center z-50">
+        <div class="text-left">
+            <span class="text-[9px] text-cyan-400 font-black uppercase">Kms Totales</span>
+            <p class="text-2xl font-black text-white" x-text="res.kmTotales"></p>
+        </div>
+        <div class="text-right">
+            <span class="text-[9px] text-yellow-500 font-black uppercase">Jornada (h:m)</span>
+            <p class="text-5xl font-black text-white leading-none" x-text="res.total"></p>
+        </div>
+    </footer>
+
+    <script>
+        function tmsaApp() {
+            return {
+                view: 'registro',
+                fechaSeleccionada: new Date().toISOString().split('T')[0],
+                calMonth: new Date().getMonth(),
+                calYear: new Date().getFullYear(),
+                form: { tipo: 'continuo', bus1: '', horaE1: '', horaS1: '', horaE2: '', horaS2: '', kmI1: '', kmF1: '', kmI2: '', kmF2: '', comida: 'NO', cena: 'NO' },
+                res: { total: '00:00', noctStr: '0:00', realMin: 0, noctMin: 0, kmTotales: 0 },
+                history: [],
+                alarma1: { disponible: false, hora: '' },
+                alarma2: { disponible: false, hora: '' },
+
+                initApp() {
+                    this.history = JSON.parse(localStorage.getItem('tmsa_history_v95') || '[]');
+                    window.setupSync('history', (data) => { if(data) this.history = data; });
+                    this.cargarHojaDesdeMemoria();
+                },
+
+                get calendarDays() {
+                    let first = new Date(this.calYear, this.calMonth, 1).getDay();
+                    if (first === 0) first = 7;
+                    let daysInMonth = new Date(this.calYear, this.calMonth + 1, 0).getDate();
+                    let days = [];
+                    for (let i = 1; i < first; i++) days.push({ date: null });
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        let dateStr = `${this.calYear}-${String(this.calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        let saved = JSON.parse(localStorage.getItem('tmsa_drafts_v95') || '{}')[dateStr];
+                        days.push({
+                            dayNum: d,
+                            date: dateStr,
+                            isToday: new Date().toISOString().split('T')[0] === dateStr,
+                            isSelected: this.fechaSeleccionada === dateStr,
+                            tipo: saved ? saved.tipo : null
+                        });
+                    }
+                    return days;
+                },
+
+                get nombreMesSeleccionado() {
+                    return new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(new Date(this.calYear, this.calMonth));
+                },
+
+                prevMonth() { if (this.calMonth === 0) { this.calMonth = 11; this.calYear--; } else { this.calMonth--; } },
+                nextMonth() { if (this.calMonth === 11) { this.calMonth = 0; this.calYear++; } else { this.calMonth++; } },
+                selectDate(date) { this.fechaSeleccionada = date; this.cargarHojaDesdeMemoria(); },
+
+                calcNoct(e, s) {
+                    if (!e || !s) return 0;
+                    let ini = new Date("2000-01-01T" + e), fin = new Date("2000-01-01T" + s);
+                    if (fin <= ini) fin.setDate(fin.getDate() + 1);
+                    let n = 0, cur = new Date(ini);
+                    while (cur < fin) { let h = cur.getHours(); if (h >= 22 || h < 6) n++; cur.setMinutes(cur.getMinutes() + 1); }
+                    return n;
+                },
+
+                calcularTodo() {
+                    let m1 = 0, m2 = 0, n1 = 0, n2 = 0;
+                    if (this.form.horaE1 && this.form.horaS1) {
+                        let dE = new Date("2000-01-01T" + this.form.horaE1), dS = new Date("2000-01-01T" + this.form.horaS1);
+                        if(dS <= dE) dS.setDate(dS.getDate() + 1);
+                        m1 = (dS - dE) / 60000; n1 = this.calcNoct(this.form.horaE1, this.form.horaS1);
+                    }
+                    if (this.form.tipo === 'partido' && this.form.horaE2 && this.form.horaS2) {
+                        let dE = new Date("2000-01-01T" + this.form.horaE2), dS = new Date("2000-01-01T" + this.form.horaS2);
+                        if(dS <= dE) dS.setDate(dS.getDate() + 1);
+                        m2 = (dS - dE) / 60000; n2 = this.calcNoct(this.form.horaE2, this.form.horaS2);
+                    }
+                    this.res.realMin = m1 + m2; this.res.noctMin = n1 + n2;
+                    let k1 = (parseInt(this.form.kmF1) || 0) - (parseInt(this.form.kmI1) || 0);
+                    let k2 = (parseInt(this.form.kmF2) || 0) - (parseInt(this.form.kmI2) || 0);
+                    this.res.kmTotales = (k1 > 0 ? k1 : 0) + (k2 > 0 ? k2 : 0);
+                    let hFin = (this.form.tipo === 'partido' && this.form.horaS2) ? this.form.horaS2 : this.form.horaS1;
+                    let hTotal = this.res.realMin / 60;
+                    this.form.comida = (hTotal >= 6 && hFin >= "15:30") || (hTotal >= 9) ? "SI" : (hFin >= "15:00" ? "AVISO" : "NO");
+                    this.form.cena = (hFin >= "23:00" || (hFin >= "00:00" && hFin < "05:00")) ? "SI" : (hFin >= "22:00" ? "AVISO" : "NO");
+                    let dM = this.res.realMin < 360 ? 360 : this.res.realMin;
+                    this.res.total = Math.floor(dM/60).toString().padStart(2,'0') + ":" + Math.round(dM%60).toString().padStart(2,'0');
+                    this.res.noctStr = Math.floor(this.res.noctMin/60) + ":" + (this.res.noctMin%60).toString().padStart(2,'0');
+                    this.saveDraft();
+                },
+
+                get totalesMes() {
+                    const mS = `${this.calYear}-${String(this.calMonth+1).padStart(2,'0')}`;
+                    let f = this.history.filter(i => i.fecha.startsWith(mS));
+                    let hT = 0, dT = 0, nT = 0, kT = 0;
+                    f.forEach(i => {
+                        let [hh, mm] = i.hStr.split(':').map(Number); hT += hh + (mm/60);
+                        let [nh, nm] = i.noct.split(':').map(Number); nT += nh + (nm/60);
+                        dT += i.dieta; kT += (i.km || 0);
+                    });
+                    return { horas: hT.toFixed(1), dietas: dT, noct: nT.toFixed(1), kms: kT };
+                },
+
+                get historyByWeeks() {
+                    const mS = `${this.calYear}-${String(this.calMonth+1).padStart(2,'0')}`;
+                    let filt = this.history.filter(i => i.fecha.startsWith(mS)).sort((a,b) => a.fecha.localeCompare(b.fecha));
+                    let wks = {};
+                    filt.forEach(it => {
+                        let d = new Date(it.fecha), w = Math.ceil((((d - new Date(d.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
+                        if (!wks[w]) wks[w] = { num: w, dias: [] }; wks[w].dias.push(it);
+                    });
+                    return Object.values(wks);
+                },
+
+                sugerirAlarma(n) {
+                    const hE = n === 1 ? this.form.horaE1 : this.form.horaE2;
+                    if (!hE) { this['alarma'+n].disponible = false; return; }
+                    let [h, m] = hE.split(':').map(Number);
+                    let d = new Date(); d.setHours(h, m, 0); d.setMinutes(d.getMinutes() - 45);
+                    this['alarma'+n].hora = d.getHours().toString().padStart(2,'0') + ":" + d.getMinutes().toString().padStart(2,'0');
+                    this['alarma'+n].disponible = true;
+                },
+
+                lanzarAlarma(hora) {
+                    let [h, m] = hora.split(':');
+                    window.location.href = `intent://#Intent;action=android.intent.action.SET_ALARM;i.android.intent.extra.alarm.HOUR=${parseInt(h)};i.android.intent.extra.alarm.MINUTES=${parseInt(m)};s.android.intent.extra.alarm.MESSAGE=Preparar Bus;b.android.intent.extra.alarm.SKIP_UI=false;end`;
+                },
+
+                estiloBoton(e) { return e === 'SI' ? 'bg-green-600 border-green-400 text-white' : (e === 'AVISO' ? 'badge-aviso border-yellow-600' : 'bg-gray-800 border-gray-700 text-gray-500'); },
+                toggleDiet(t) { this.form[t] = (this.form[t] === 'SI' ? 'NO' : 'SI'); this.saveDraft(); },
+                validarYCalcular() { if (this.form.horaS1 && !this.form.horaE1) { alert("¡Falta Entrada!"); this.form.horaS1 = ''; return; } this.calcularTodo(); },
+                cargarHojaDesdeMemoria() {
+                    const s = JSON.parse(localStorage.getItem('tmsa_drafts_v95') || '{}');
+                    this.form = s[this.fechaSeleccionada] || { tipo: 'continuo', bus1: '', horaE1: '', horaS1: '', horaE2: '', horaS2: '', kmI1: '', kmF1: '', kmI2: '', kmF2: '', comida: 'NO', cena: 'NO' };
+                    this.calcularTodo(); this.sugerirAlarma(1); this.sugerirAlarma(2);
+                },
+                saveDraft() {
+                    const s = JSON.parse(localStorage.getItem('tmsa_drafts_v95') || '{}');
+                    s[this.fechaSeleccionada] = this.form; localStorage.setItem('tmsa_drafts_v95', JSON.stringify(s));
+                },
+                guardarJornada() {
+                    if (!this.form.bus1) { alert("¡BUS!"); return; }
+                    this.history = this.history.filter(i => i.fecha !== this.fechaSeleccionada);
+                    const dts = (this.form.comida === 'SI' ? 1 : 0) + (this.form.cena === 'SI' ? 1 : 0);
+                    this.history.push({ fecha: this.fechaSeleccionada, bus: this.form.bus1, hStr: this.res.total, noct: this.res.noctStr, dieta: dts, km: this.res.kmTotales });
+                    localStorage.setItem('tmsa_history_v95', JSON.stringify(this.history));
+                    window.cloudSave('history', this.history);
+                    alert("OK."); this.view = 'historial';
+                },
+                archivarMesActual() {
+                    if (confirm("¿Archivar mes actual?")) {
+                        const mS = `${this.calYear}-${String(this.calMonth+1).padStart(2,'0')}`;
+                        let arc = JSON.parse(localStorage.getItem('tmsa_archivo') || '[]');
+                        arc.push({ id: mS, datos: this.history.filter(i => i.fecha.startsWith(mS)) });
+                        localStorage.setItem('tmsa_archivo', JSON.stringify(arc));
+                        this.history = this.history.filter(i => !i.fecha.startsWith(mS));
+                        localStorage.setItem('tmsa_history_v95', JSON.stringify(this.history));
+                        window.cloudSave('history', this.history);
+                        alert("Mes archivado correctamente.");
+                    }
+                },
+                abrirArchivoHistorico() {
+                    let arc = JSON.parse(localStorage.getItem('tmsa_archivo') || '[]');
+                    if(arc.length === 0) return alert("El archivo está vacío.");
+                    alert("Meses archivados:\n" + arc.map(m => m.id).join("\n"));
+                },
+                borrarFila(f) { if(confirm("¿Borrar esta jornada?")){this.history = this.history.filter(i => i.fecha !== f); localStorage.setItem('tmsa_history_v95', JSON.stringify(this.history)); window.cloudSave('history', this.history);}}
+            }
+        }
+    </script>
+</body>
+</html>
